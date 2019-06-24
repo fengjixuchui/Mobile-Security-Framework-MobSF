@@ -110,11 +110,11 @@ def dex_2_smali(app_dir, tools_dir):
             if len(settings.BACKSMALI_BINARY) > 0 and isFileExists(settings.BACKSMALI_BINARY):
                 bs_path = settings.BACKSMALI_BINARY
             else:
-                bs_path = os.path.join(tools_dir, 'baksmali.jar')
+                bs_path = os.path.join(tools_dir, 'baksmali-2.2.7.jar')
             output = os.path.join(app_dir, 'smali_source/')
             args = [
                 settings.JAVA_PATH + 'java',
-                '-jar', bs_path, dex_path, '-o', output
+                '-jar', bs_path, 'd', dex_path, '-o', output
             ]
             subprocess.call(args)
     except:
@@ -147,7 +147,7 @@ def jar_2_java(app_dir, tools_dir):
                 ):
                     jd_path = settings.CFR_DECOMPILER_BINARY
                 else:
-                    jd_path = os.path.join(tools_dir, 'cfr_0_132.jar')
+                    jd_path = os.path.join(tools_dir, 'cfr-0.144.jar')
                 args = [settings.JAVA_PATH + 'java', '-jar',
                         jd_path, jar_path, '--outputdir', output, '--silent', 'true']
             elif settings.DECOMPILER == "procyon":
@@ -158,7 +158,7 @@ def jar_2_java(app_dir, tools_dir):
                     pd_path = settings.PROCYON_DECOMPILER_BINARY
                 else:
                     pd_path = os.path.join(
-                        tools_dir, 'procyon-decompiler-0.5.30.jar')
+                        tools_dir, 'procyon-decompiler-0.5.34.jar')
                 args = [settings.JAVA_PATH + 'java',
                         '-jar', pd_path, jar_path, '-o', output]
             subprocess.call(args)

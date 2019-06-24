@@ -14,10 +14,6 @@ LABEL \
 ENV DEBIAN_FRONTEND="noninteractive"
 ENV PDFGEN_PKGFILE="wkhtmltox_0.12.5-1.bionic_amd64.deb" 
 ENV PDFGEN_URL="https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.5/${PDFGEN_PKGFILE}"
-ENV YARA_URL="https://github.com/rednaga/yara-python-1"
-
-#Postgres support is set to false by default
-ARG POSTGRES=False
 
 #Update the repository sources list
 #Install Required Libs
@@ -27,14 +23,19 @@ RUN apt update -y && apt install -y \
     libssl-dev \
     libffi-dev \
     libxml2-dev \
-    libxslt1-dev
+    libxslt1-dev \
+    locales
 
-#Install Oracle JDK11 LTS
+#set locales
+RUN locale-gen en_US.UTF-8
+ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en' LC_ALL='en_US.UTF-8'
+
+#Install Oracle JDK12
 RUN apt install -y software-properties-common && \
     add-apt-repository ppa:linuxuprising/java -y && \
     apt update && \
-    echo oracle-java11-installer shared/accepted-oracle-license-v1-2 select true | /usr/bin/debconf-set-selections && \
-    apt install -y oracle-java11-installer
+    echo oracle-java12-installer shared/accepted-oracle-license-v1-2 select true | /usr/bin/debconf-set-selections && \
+    apt install -y oracle-java12-installer
 
 #Install Python 3
 RUN \
@@ -44,7 +45,7 @@ RUN \
     python3-setuptools && \
     python3 /usr/lib/python3/dist-packages/easy_install.py pip
 
-#Install sqlite3 client and pdf generator needed dependencies
+#Install git, sqlite3 client and pdf generator needed dependencies
 RUN \
     apt install -y \
     sqlite3 \
@@ -52,58 +53,41 @@ RUN \
     libjpeg-turbo8 \
     fontconfig \
     xorg \
-    xfonts-75dpi
-
-#Install git
-RUN \
-    apt install -y \
+    xfonts-75dpi \
     git
 
 #Install wkhtmltopdf for PDF Reports
 WORKDIR /tmp
 RUN wget ${PDFGEN_URL} && \
-    dpkg -i ${PDFGEN_PKGFILE}
+    dpkg -i ${PDFGEN_PKGFILE} && \
+    rm -rf ${PDFGEN_PKGFILE}
+
    
 #Add MobSF master
 COPY . /root/Mobile-Security-Framework-MobSF
+WORKDIR /root/Mobile-Security-Framework-MobSF
 
 #Enable Use Home Directory
-WORKDIR /root/Mobile-Security-Framework-MobSF/MobSF
-RUN sed -i 's/USE_HOME = False/USE_HOME = True/g' settings.py
+RUN sed -i 's/USE_HOME = False/USE_HOME = True/g' MobSF/settings.py
 
 #Kali fix to support 32 bit execution
-WORKDIR /root/Mobile-Security-Framework-MobSF/scripts
-RUN ./kali_fix.sh
+RUN ./scripts/kali_fix.sh
 
-#Install Dependencies
-WORKDIR /root/Mobile-Security-Framework-MobSF
-RUN pip3 install -r requirements.txt
-
-#check if Postgres support must be enabled 
-WORKDIR /root/Mobile-Security-Framework-MobSF/scripts
-RUN chmod +x ./postgres_support.sh; sync; ./postgres_support.sh $POSTGRES
-
-#Install apkid dependencies, and enable it 
-WORKDIR /tmp
-RUN git clone --recursive ${YARA_URL} yara-python && \
-    cd yara-python && \
-    python3 setup.py build --enable-dex install && \
-    pip3 install apkid && \
-    rm -fr /tmp/yara-python && \
-    sed -i 's/APKID_ENABLED.*/APKID_ENABLED = True/' /root/Mobile-Security-Framework-MobSF/MobSF/settings.py
-
-#update apkid rules
-WORKDIR /tmp
-RUN git clone https://github.com/rednaga/APKiD.git && \
-    cd APKiD && \
-    python3 prep-release.py && \
-    cp apkid/rules/rules.yarc /root/Mobile-Security-Framework-MobSF/MalwareAnalyzer/ && \
-    sed -i 's#RULES_DIR =.*#RULES_DIR =  "/root/Mobile-Security-Framework-MobSF/MalwareAnalyzer"#' /usr/local/lib/python3.6/dist-packages/apkid/rules.py && \
-    cd .. && \
-    rm -fr APKiD
+#Postgres support is set to false by default
+ARG POSTGRES=False
+#check if Postgres support needs to be enabled 
+RUN cd scripts && chmod +x postgres_support.sh; sync; ./postgres_support.sh $POSTGRES
 
 #Add apktool working path
 RUN mkdir -p /root/.local/share/apktool/framework
+
+#Install APKiD dependencies
+RUN pip3 install wheel
+RUN pip3 wheel --wheel-dir=/tmp/yara-python --build-option="build" --build-option="--enable-dex" git+https://github.com/VirusTotal/yara-python.git@v3.10.0
+RUN pip3 install --no-index --find-links=/tmp/yara-python yara-python
+
+#Install Dependencies
+RUN pip3 install -r requirements.txt
 
 #Cleanup
 RUN \
@@ -116,7 +100,8 @@ RUN rm -rf /var/lib/apt/lists/* /tmp/* > /dev/null 2>&1
 #Expose MobSF Port
 EXPOSE 8000
 
-WORKDIR /root/Mobile-Security-Framework-MobSF
+RUN python3 manage.py makemigrations
+RUN python3 manage.py migrate
 
 #Run MobSF
-CMD ["python3","manage.py","runserver","0.0.0.0:8000"]
+CMD ["gunicorn", "-b", "0.0.0.0:8000", "MobSF.wsgi:application", "--workers=1", "--threads=4", "--timeout=1800"]

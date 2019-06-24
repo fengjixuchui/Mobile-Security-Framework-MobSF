@@ -28,9 +28,11 @@ from MobSF.utils import (
 from StaticAnalyzer.models import StaticAnalyzerAndroid
 from StaticAnalyzer.views.shared_func import (
     file_size,
+    firebase_analysis,
     hash_gen,
     unzip,
-    score
+    score,
+    update_scan_timestamp,
 )
 
 from StaticAnalyzer.views.android.db_interaction import (
@@ -49,7 +51,8 @@ from StaticAnalyzer.views.android.converter import (
 )
 from StaticAnalyzer.views.android.cert_analysis import (
     get_hardcoded_cert_keystore,
-    cert_info
+    cert_info,
+
 )
 from StaticAnalyzer.views.android.manifest_analysis import (
     manifest_data,
@@ -64,7 +67,12 @@ from StaticAnalyzer.views.android.icon_analysis import (
     get_icon,
     find_icon_path_zip,
 )
+from StaticAnalyzer.views.android.playstore import (
+    get_app_details,
+)
+from MalwareAnalyzer.views.domain_check import malware_check
 from MalwareAnalyzer.views.apkid import apkid_analysis
+import MalwareAnalyzer.views.Trackers as Trackers
 import MalwareAnalyzer.views.VirusTotal as VirusTotal
 logger = logging.getLogger(__name__)
 
@@ -132,6 +140,13 @@ def static_analyzer(request, api=False):
 
                     app_dic['files'] = unzip(
                         app_dic['app_path'], app_dic['app_dir'])
+                    if not app_dic['files']:
+                        # Can't Analyze APK, bail out.
+                        msg = "APK file is invalid or corrupt"
+                        if api:
+                            return print_n_send_error_response(request, msg, True)
+                        else:
+                            return print_n_send_error_response(request, msg, False)
                     app_dic['certz'] = get_hardcoded_cert_keystore(app_dic[
                                                                    'files'])
 
@@ -167,7 +182,8 @@ def static_analyzer(request, api=False):
                     app_dic['mani'] = '../ManifestView/?md5=' + \
                         app_dic['md5'] + '&type=apk&bin=1'
                     man_data_dic = manifest_data(app_dic['parsed_xml'])
-
+                    app_dic['playstore'] = get_app_details(
+                        man_data_dic['packagename'])
                     man_an_dic = manifest_analysis(
                         app_dic['parsed_xml'],
                         man_data_dic
@@ -176,9 +192,12 @@ def static_analyzer(request, api=False):
                     bin_an_buff += elf_analysis(app_dic['app_dir'])
                     bin_an_buff += res_analysis(app_dic['app_dir'])
                     cert_dic = cert_info(
-                        app_dic['app_dir'], app_dic['tools_dir'])
+                        app_dic['app_dir'], app_dic['app_file'], app_dic['tools_dir'])
                     apkid_results = apkid_analysis(app_dic[
                         'app_dir'], app_dic['app_path'], app_dic['app_name'])
+                    tracker = Trackers.Trackers(
+                        app_dic['app_dir'], app_dic['tools_dir'])
+                    tracker_res = tracker.get_trackers()
                     dex_2_jar(app_dic['app_path'], app_dic[
                               'app_dir'], app_dic['tools_dir'])
                     dex_2_smali(app_dic['app_dir'], app_dic['tools_dir'])
@@ -188,15 +207,33 @@ def static_analyzer(request, api=False):
                         man_an_dic['permissons'],
                         "apk"
                     )
-                    logger.info("Generating Java and Smali Downloads")
-                    gen_downloads(app_dic['app_dir'], app_dic[
-                                  'md5'], app_dic['icon_path'])
 
                     # Get the strings
-                    app_dic['strings'] = strings_jar(
+                    string_res = strings_jar(
                         app_dic['app_file'],
                         app_dic['app_dir']
                     )
+                    if string_res:
+                        app_dic['strings'] = string_res['strings']
+                        code_an_dic["urls_list"].extend(
+                            string_res['urls_list'])
+                        code_an_dic["urls"].extend(string_res['url_nf'])
+                        code_an_dic["emails"].extend(string_res['emails_nf'])
+                    else:
+                        app_dic['strings'] = []
+
+                    # Firebase DB Check
+                    code_an_dic['firebase'] = firebase_analysis(
+                           list(set(code_an_dic["urls_list"])))
+                    # Domain Extraction and Malware Check
+                    logger.info(
+                        "Performing Malware Check on extracted Domains")
+                    code_an_dic["domains"] = malware_check(
+                        list(set(code_an_dic["urls_list"])))
+
+                    logger.info("Generating Java and Smali Downloads")
+                    gen_downloads(app_dic['app_dir'], app_dic[
+                                  'md5'], app_dic['icon_path'])
                     app_dic['zipped'] = '&type=apk'
 
                     logger.info("Connecting to Database")
@@ -212,7 +249,9 @@ def static_analyzer(request, api=False):
                                 cert_dic,
                                 bin_an_buff,
                                 apkid_results,
+                                tracker_res,
                             )
+                            update_scan_timestamp(app_dic['md5'])
                         elif rescan == '0':
                             logger.info("Saving to Database")
                             create_db_entry(
@@ -223,6 +262,7 @@ def static_analyzer(request, api=False):
                                 cert_dic,
                                 bin_an_buff,
                                 apkid_results,
+                                tracker_res,
                             )
                     except:
                         PrintException("Saving to Database Failed")
@@ -234,6 +274,7 @@ def static_analyzer(request, api=False):
                         cert_dic,
                         bin_an_buff,
                         apkid_results,
+                        tracker_res,
                     )
                 context["average_cvss"], context[
                     "security_score"] = score(context["findings"])
@@ -248,7 +289,7 @@ def static_analyzer(request, api=False):
                                      app_dic['md5']) + '.apk',
                         app_dic['md5']
                     )
-                template = "static_analysis/static_analysis.html"
+                template = "static_analysis/android_binary_analysis.html"
                 if api:
                     return context
                 else:
@@ -314,12 +355,12 @@ def static_analyzer(request, api=False):
                         )
 
                         man_data_dic = manifest_data(app_dic['persed_xml'])
-
+                        app_dic['playstore'] = get_app_details(
+                            man_data_dic['packagename'])
                         man_an_dic = manifest_analysis(
                             app_dic['persed_xml'],
                             man_data_dic
                         )
-
                         # Get icon
                         eclipse_res_path = os.path.join(
                             app_dic['app_dir'], 'res')
@@ -351,6 +392,14 @@ def static_analyzer(request, api=False):
                             man_an_dic['permissons'],
                             pro_type
                         )
+                        # Firebase DB Check
+                        code_an_dic['firebase'] = firebase_analysis(
+                            list(set(code_an_dic["urls_list"])))
+                        # Domain Extraction and Malware Check
+                        logger.info(
+                            "Performing Malware Check on extracted Domains")
+                        code_an_dic["domains"] = malware_check(
+                            list(set(code_an_dic["urls_list"])))
                         logger.info("Connecting to Database")
                         try:
                             # SAVE TO DB
@@ -364,7 +413,9 @@ def static_analyzer(request, api=False):
                                     cert_dic,
                                     bin_an_buff,
                                     {},
+                                    {},
                                 )
+                                update_scan_timestamp(app_dic['md5'])
                             elif rescan == '0':
                                 logger.info("Saving to Database")
                                 create_db_entry(
@@ -374,6 +425,7 @@ def static_analyzer(request, api=False):
                                     code_an_dic,
                                     cert_dic,
                                     bin_an_buff,
+                                    {},
                                     {},
                                 )
                         except:
@@ -386,6 +438,7 @@ def static_analyzer(request, api=False):
                             cert_dic,
                             bin_an_buff,
                             {},
+                            {},
                         )
                     else:
                         msg = "This ZIP Format is not supported"
@@ -396,13 +449,14 @@ def static_analyzer(request, api=False):
                             return HttpResponseRedirect('/zip_format/')
                 context["average_cvss"], context[
                     "security_score"] = score(context["findings"])
-                template = "static_analysis/static_analysis_android_zip.html"
+                template = "static_analysis/android_source_analysis.html"
                 if api:
                     return context
                 else:
                     return render(request, template, context)
             else:
-                logger.error("Only APK,IPA and Zipped Android/iOS Source code supported now!")
+                logger.error(
+                    "Only APK,IPA and Zipped Android/iOS Source code supported now!")
         else:
             msg = "Hash match failed or Invalid file extension or file type"
             if api:
