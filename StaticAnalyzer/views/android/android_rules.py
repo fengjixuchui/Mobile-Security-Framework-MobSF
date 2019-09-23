@@ -220,7 +220,7 @@ RULES = [
     {
         'desc': 'The App uses an insecure Random Number Generator.',
         'type': 'regex',
-        'regex1': r'java\.util\.Random',
+        'regex1': r'\bjava\.util\.Random\b',
         'level': 'high',
         'match': 'single_regex',
         'input_case': 'exact',
@@ -244,10 +244,10 @@ RULES = [
                  ' should never be used in Secure Crypto Implementation.'),
         'type': 'string',
         'string1': '.hashCode()',
-        'level': 'high',
+        'level': 'warning',
         'match': 'single_string',
         'input_case': 'exact',
-        'cvss': 4.3,
+        'cvss': 2.3,
         'cwe': 'CWE-327',
     },
     {

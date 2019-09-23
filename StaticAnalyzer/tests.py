@@ -35,7 +35,6 @@ def static_analysis_test():
                 else:
                     logger.error('Performing Upload: %s', filename)
                     return True
-                    break
         logger.info('[OK] Completed Upload test')
         logger.info('Running Static Analysis Test')
         for upl in uploaded:
@@ -49,7 +48,6 @@ def static_analysis_test():
             else:
                 logger.error('Performing Static Analysis: %s', upl)
                 return True
-                break
         logger.info('[OK] Static Analysis test completed')
         logger.info('Running PDF Generation Test')
         if platform.system() in ['Darwin', 'Linux']:
@@ -77,7 +75,6 @@ def static_analysis_test():
                 logger.error('Generating PDF: %s', pdf)
                 logger.info(resp.content)
                 return True
-                break
         logger.info('[OK] PDF Generation test completed')
 
         # Compare apps test
@@ -232,15 +229,17 @@ def api_test():
         files = [{'file': 'opensecurity/helloworld/MainActivity.java',
                   'type': 'apk',
                   'hash': '3a552566097a8de588b8184b059b0158'},
-                 {'file': 'helloworld.app/Info.plist',
-                  'type': 'ipa',
-                  'hash': '6c23c2970551be15f32bbab0b5db0c71'},
                  {'file': 'opensecurity/webviewignoressl/MainActivity.java',
                   'type': 'studio',
                   'hash': '52c50ae824e329ba8b5b7a0f523efffe'},
                  {'file': 'DamnVulnerableIOSApp/AppDelegate.m',
                   'type': 'ios',
                   'hash': '57bb5be0ea44a755ada4a93885c3825e'}]
+        if platform.system() in ['Darwin', 'Linux']:
+            files.append({
+                'file': 'helloworld.app/Info.plist',
+                'type': 'ipa',
+                'hash': '6c23c2970551be15f32bbab0b5db0c71'})
         for sfile in files:
             resp = http_client.post(
                 '/api/v1/view_source', sfile, HTTP_AUTHORIZATION=auth)

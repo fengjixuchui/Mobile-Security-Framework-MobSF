@@ -29,9 +29,9 @@ where python >nul 2>&1 && (
     exit /b
   )
 
-  echo [INSTALL] Installing virtualenv
-  pip3 install -U pip virtualenv
-  python -m virtualenv -p python ./venv
+  echo [INSTALL] Using venv
+  rmdir /q /s venv
+  python -m venv ./venv
   .\venv\Scripts\activate
 
   set LIB=C:\Program Files\OpenSSL-Win64\lib;%LIB%
@@ -39,7 +39,7 @@ where python >nul 2>&1 && (
 
   echo [INSTALL] Installing APKiD requirements - yara-python
   pip install wheel
-  pip wheel --wheel-dir=yara-python --build-option="build" --build-option="--enable-dex" git+https://github.com/VirusTotal/yara-python.git@v3.10.0
+  pip wheel --wheel-dir=yara-python --build-option="build" --build-option="--enable-dex" git+https://github.com/VirusTotal/yara-python.git
   pip install --no-index --find-links=yara-python yara-python
 
   echo [INSTALL] Installing Requirements

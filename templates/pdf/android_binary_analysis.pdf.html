@@ -134,12 +134,10 @@ body {
                       {{ play_details.price }}
 
                   <span class="label label-info"><b>Android Version Support: </b></span>
-                    {{ play_details.required_android_version }}
+                    {{ play_details.androidVersionText }}
                    
                     <span class="label label-info"><b>Category: </b></span>
-                    {% for cat in play_details.category %}
-                    {{ cat }}, 
-                    {% endfor %}
+		    {{ play_details.genre }}
 
                     <span class="label label-info"><b>Play Store URL: </b></span>
                       <a target="_blank" href="{{ play_details.url }}"> {{ packagename }} </a>
@@ -148,11 +146,17 @@ body {
                   <p>
                   <span class="label label-info"><b>Developer Details: </b></span>
                       {{play_details.developer}},  
-                      {{play_details.developer_id}}, 
-                      {{play_details.developer_address }},
-                      {{play_details.developer_url}}, 
-                      {{play_details.developer_email}}, 
+                      {{play_details.developerId}}, 
+                      {{play_details.developerAddress }},
+                      {{play_details.developerWebsite}}, 
+                      {{play_details.developerEmail}}, 
                   </p>
+		  <p>
+                  <span class="label label-info"><b>Release Date: </b></span>
+		   {{ play_details.released }}
+		   <span class="label label-info"><b>Privacy Policy: </b></span>
+                   <a target="_blank" href="{{ play_details.privacyPolicy }}">Privacy link</a>
+		  </p>
                  <p>                                       
                       <span class="label label-info"><b>Description: </b></span>
                       <pre>{{ play_details.description }}</pre>
@@ -177,19 +181,19 @@ body {
                               {{ certinfo | safe}}
 
 {% if issued == "good" %} 
-<strong>Certicate Status: </strong><span class="label label-success">Good</span>
+<strong>Certificate Status: </strong><span class="label label-success">Good</span>
 {% elif issued == "bad" %}
-<strong>Certicate Status: </strong><span class="label label-danger">Bad</span>
+<strong>Certificate Status: </strong><span class="label label-danger">Bad</span>
 <strong>Description:</strong>App Signed by 'Android Debug' Certificate.
 Production ready applications should not be signed with 'Android Debug' Certificate.
 {% elif issued == "missing" %}
-<strong>Certicate Status: </strong><span class="label label-warning">Certificate not found</span>
+<strong>Certificate Status: </strong><span class="label label-warning">Certificate not found</span>
 {% elif issued == "bad hash" and sha256Digest is True %}
-<strong>Certicate Status: </strong><span class="label label-warning">Warning</span>
+<strong>Certificate Status: </strong><span class="label label-warning">Warning</span>
 <strong>Description:</strong>The app is signed with `SHA1withRSA`. SHA1 hash algorithm is known to have collision issues.
 <strong>Note:</strong>The manifest indicates `SHA256withRSA` is in use. Be sure to manually confirm this issue.
 {% elif issued == "bad hash" %}
-<strong>Certicate Status: </strong><span class="label label-danger">Bad</span>
+<strong>Certificate Status: </strong><span class="label label-danger">Bad</span>
 <strong>Description:</strong>The app is signed with `SHA1withRSA`. SHA1 hash algorithm is known to have collision issues.
 {% endif %}
                             </pre>
@@ -272,6 +276,16 @@ Production ready applications should not be signed with 'Android Debug' Certific
    
                        </tr>
                      {% endfor %}
+                    {% if not binary_analysis  %}
+                      <tr>
+                         <td>
+                             <p> No issue found </p>
+                         </td>
+                         <td>
+                             <span class="label label-info">info</span>
+                         </td>
+                      </tr>
+                    {% endif %}
                     </tbody>
                     </table>
 

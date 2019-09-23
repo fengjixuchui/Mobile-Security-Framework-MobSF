@@ -556,7 +556,7 @@ def url_n_email_extract(dat, relative_path):
             r'[\w().=/;,#:@?&~*+!$%\'{}-]+)'
         ),
         re.UNICODE)
-    urllist = re.findall(pattern, dat.lower())
+    urllist = re.findall(pattern, dat)
     uflag = 0
     for url in urllist:
         if url not in urls:
@@ -567,7 +567,7 @@ def url_n_email_extract(dat, relative_path):
             {'urls': urls, 'path': escape(relative_path)})
 
     # Email Extraction Regex
-    regex = re.compile(r'[\w.-]+@[\w-]+\.[\w.]+')
+    regex = re.compile(r'[\w.-]+@[\w-]+\.[\w]{2,}')
     eflag = 0
     for email in regex.findall(dat.lower()):
         if (email not in emails) and (not email.startswith('//')):

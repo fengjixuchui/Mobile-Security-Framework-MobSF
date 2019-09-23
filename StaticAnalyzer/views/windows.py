@@ -286,7 +286,7 @@ def _binary_analysis(app_dic):
             bin_an_dic['results'].append(result)
 
     # Execute binskim analysis if vm is available
-    if platform.system() != 'Windows':
+    if platform.system() != 'Windows' or 'CI' in os.environ:
         if settings.WINDOWS_VM_IP:
             logger.info('Windows VM configured.')
             global proxy
@@ -359,7 +359,7 @@ def binskim(name, bin_an_dic, run_local=False, app_dir=None):
         path = bin_path
         output_p = '-o'
         output_d = bin_path + '_binskim'
-        verbose = '-v'
+        verbose = '--verbose'
         policy_p = '--config'
         policy_d = 'default'  # TODO(Other policies?)
 
@@ -368,8 +368,8 @@ def binskim(name, bin_an_dic, run_local=False, app_dir=None):
             binskim_path,
             command,
             path,
-            output_p, output_d,
             verbose,
+            output_p, output_d,
             policy_p, policy_d,
         ]
 
@@ -394,25 +394,27 @@ def binskim(name, bin_an_dic, run_local=False, app_dir=None):
 def parse_binskim(bin_an_dic, output):
     """Parse output to results and warnings."""
     current_run = output['runs'][0]
-
     if 'results' in current_run:
         rules = output['runs'][0]['rules']
         for res in current_run['results']:
             if res['level'] != 'pass':
+                if len(res['formattedRuleMessage']['arguments']) > 2:
+                    info = ('{}, {}').format(
+                        res['formattedRuleMessage']['arguments'][1],
+                        res['formattedRuleMessage']['arguments'][2])
+                else:
+                    info = ''
                 result = {
                     'rule_id': res['ruleId'],
                     'status': 'Insecure',
+                    'info': info,
                     'desc': rules[res['ruleId']]['shortDescription'],
                 }
-                if len(res['formattedRuleMessage']['arguments']) > 2:
-                    result['info'] = res[
-                        'formattedRuleMessage']['arguments'][2]
-                else:
-                    result['info'] = ''
             else:
                 result = {
                     'rule_id': res['ruleId'],
                     'status': 'Secure',
+                    'info': '',
                     'desc': rules[res['ruleId']]['shortDescription'],
                 }
             bin_an_dic['results'].append(result)
@@ -422,6 +424,7 @@ def parse_binskim(bin_an_dic, output):
         warning = {
             'rule_id': 'No Binskim-Results',
             'status': 'Info',
+            'info': '',
             'desc': 'No results from Binskim.',
         }
         bin_an_dic['warnings'].append(warning)
@@ -431,6 +434,7 @@ def parse_binskim(bin_an_dic, output):
             warning = {
                 'rule_id': warn['ruleId'],
                 'status': 'Info',
+                'info': '',
                 'desc': warn['message'],
             }
             bin_an_dic['warnings'].append(warning)
@@ -528,6 +532,7 @@ def binscope(name, bin_an_dic, run_local=False, app_dir=None):
             result = {
                 'rule_id': item.find('issueType').text,
                 'status': status,
+                'info': '',
                 'desc': desc,
             }
             bin_an_dic['results'].append(result)

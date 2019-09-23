@@ -18,25 +18,37 @@ else
   exit 1
 fi
 
-echo '[INSTALL] Installing virtualenv'
-python3 -m pip install virtualenv
-python3 -m virtualenv venv -p python3
-source venv/bin/activate
-
 unamestr=$(uname)
 if [[ "$unamestr" == 'Darwin' ]]; then
   export ARCHFLAGS='-arch x86_64'
   export LDFLAGS='-L/usr/local/opt/openssl/lib'
-  export CFLAGS='-I/usr/local/opt/openssl/include'  
+  export CFLAGS='-I/usr/local/opt/openssl/include'
+  current_macos_version="$(sw_vers -productVersion | awk -F '.' '{print $1 "." $2}')"
+  major=$(echo "$current_macos_version" | cut -d'.' -f1)
+  minor=$(echo "$current_macos_version" | cut -d'.' -f2)
+  is_installed=$(pkgutil --pkgs=com.apple.pkg.macOS_SDK_headers_for_macOS_${current_macos_version})
+  if [ -z "$is_installed" ]; then 
+      if [ "$major" -ge "10" ] && [ "$minor" -ge "14" ]; then 
+          echo 'Please install command-line tools and macOS headers.'
+          echo 'xcode-select --install'
+          echo "sudo installer -pkg /Library/Developer/CommandLineTools/Packages/macOS_SDK_headers_for_macOS_${current_macos_version}.pkg -target /"
+          exit 1
+      fi    
+  fi  
 fi
+
+echo '[INSTALL] Using venv'
+rm -rf ./venv
+python3 -m venv ./venv
+source venv/bin/activate
 
 echo '[INSTALL] Installing APKiD requirements - yara-python'
 pip install wheel
-pip wheel --wheel-dir=/tmp/yara-python --build-option='build' --build-option='--enable-dex' git+https://github.com/VirusTotal/yara-python.git@v3.10.0
-pip install --no-index --find-links=/tmp/yara-python yara-python
+pip wheel --wheel-dir=/tmp/yara-python --build-option='build' --build-option='--enable-dex' git+https://github.com/VirusTotal/yara-python.git
+pip install --no-cache-dir --no-index --find-links=/tmp/yara-python yara-python
 
 echo '[INSTALL] Installing Requirements'
-pip install -r requirements.txt
+pip install --no-cache-dir -r requirements.txt
 
 echo '[INSTALL] Clean Up'
 bash scripts/clean.sh y
