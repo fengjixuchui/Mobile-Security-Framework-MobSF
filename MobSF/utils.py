@@ -282,6 +282,7 @@ def print_n_send_error_response(request,
             'title': 'Error',
             'exp': exp,
             'doc': msg,
+            'version': settings.MOBSF_VER,
         }
         template = 'general/error.html'
         return render(request, template, context, status=500)
@@ -625,5 +626,7 @@ def get_proxy_ip(identifier):
 
 def is_safe_path(safe_root, check_path):
     """Detect Path Traversal."""
+    safe_root = os.path.normpath(safe_root)
+    check_path = os.path.normpath(check_path)
     return os.path.commonprefix(
         (os.path.realpath(check_path), safe_root)) == safe_root

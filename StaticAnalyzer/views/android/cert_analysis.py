@@ -23,29 +23,22 @@ def get_hardcoded_cert_keystore(files):
     """Returns the hardcoded certificate keystore."""
     try:
         logger.info('Getting Hardcoded Certificates/Keystores')
-        dat = ''
-        certz = ''
-        key_store = ''
+        findings = []
+        certz = []
+        key_store = []
         for file_name in files:
             ext = file_name.split('.')[-1]
             if re.search('cer|pem|cert|crt|pub|key|pfx|p12', ext):
-                certz += escape(file_name) + '</br>'
+                certz.append(escape(file_name))
             if re.search('jks|bks', ext):
-                key_store += escape(file_name) + '</br>'
-        if len(certz) > 1:
-            dat += (
-                '<tr><td>Certificate/Key Files Hardcoded'
-                + ' inside the App.</td><td>'
-                + certz
-                + '</td><tr>'
-            )
-        if len(key_store) > 1:
-            dat += (
-                '<tr><td>Hardcoded Keystore Found.</td><td>'
-                + key_store
-                + '</td><tr>'
-            )
-        return dat
+                key_store.append(escape(file_name))
+        if certz:
+            desc = 'Certificate/Key files hardcoded inside the app.'
+            findings.append({'finding': desc, 'files': certz})
+        if key_store:
+            desc = 'Hardcoded Keystore found.'
+            findings.append({'finding': desc, 'files': key_store})
+        return findings
     except Exception:
         logger.exception('Getting Hardcoded Certificates/Keystores')
 
@@ -54,8 +47,9 @@ def cert_info(app_dir, app_file):
     """Return certificate information."""
     try:
         logger.info('Reading Code Signing Certificate')
-        issued = ''
+        status = ''
         manidat = ''
+        cert_info = ''
         certlist = []
         cert_path = os.path.join(app_dir, 'META-INF/')
 
@@ -110,25 +104,36 @@ def cert_info(app_dir, app_file):
             certlist.append('Bit Size: {}'.format(x509_public_key.bit_size))
             certlist.append('Fingerprint: {}'.format(
                 binascii.hexlify(x509_public_key.fingerprint).decode('utf-8')))
-        certlist = '\n'.join(certlist)
-        if a.is_signed():
-            issued = 'good'
-        else:
-            issued = 'missing'
-        if re.findall(r'CN=Android Debug', certlist):
-            issued = 'bad'
-        if re.findall(r'Hash Algorithm: sha1', certlist):
-            issued = 'bad hash'
+        cert_info = '\n'.join(certlist)
         if 'MANIFEST.MF' in files:
             manifestfile = os.path.join(cert_path, 'MANIFEST.MF')
         if manifestfile:
             with open(manifestfile, 'r', encoding='utf-8') as manifile:
                 manidat = manifile.read()
         sha256_digest = bool(re.findall(r'SHA-256-Digest', manidat))
+        if a.is_signed():
+            status = 'good'
+            desc = 'Certificate looks good.'
+        else:
+            status = 'missing'
+            desc = 'Certificate is not found'
+        if re.findall(r'CN=Android Debug', cert_info):
+            status = 'bad'
+            desc = ('This is a debug certificate. Production application'
+                    ' must not be shipped with a debug certificate.')
+        if re.findall(r'Hash Algorithm: sha1', cert_info):
+            status = 'bad'
+            desc = ('The app is signed with SHA1withRSA. SHA1 hash algorithm'
+                    ' is known to have collision issues.')
+            if sha256_digest:
+                status = 'warning'
+                desc += ('The manifest indicates SHA256withRSA is in use. '
+                         'Please verify this manually.')
+
         cert_dic = {
-            'cert_info': certlist,
-            'issued': issued,
-            'sha256Digest': sha256_digest,
+            'certificate_info': cert_info,
+            'certificate_status': status,
+            'description': desc,
         }
         return cert_dic
     except Exception:
