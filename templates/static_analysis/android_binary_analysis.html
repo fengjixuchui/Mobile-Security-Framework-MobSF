@@ -77,14 +77,6 @@
             </a>
           </li>
           <li class="nav-item">
-            <a href="#binary_analysis" class="nav-link">
-              <i class="nav-icon fas fa-flag"></i>
-              <p>
-                Binary Analysis
-              </p>
-            </a>
-          </li>
-          <li class="nav-item">
             <a href="#android_api" class="nav-link">
               <i class="nav-icon fab fa-android"></i>
               <p>
@@ -111,6 +103,14 @@
             </a>
             <ul class="nav nav-treeview">
               <li class="nav-item">
+                <a href="#network_security" class="nav-link">
+                  <i class="nav-icon fas fa-lock"></i>
+                  <p>
+                    Network Security
+                  </p>
+                </a>
+              </li>
+              <li class="nav-item">
                 <a href="#manifest" class="nav-link">
                   <i class="fas fa-search nav-icon"></i>
                   <p>Manifest Analysis</p>
@@ -120,6 +120,18 @@
                 <a href="#code_analysis" class="nav-link">
                   <i class="fa fa-code nav-icon"></i>
                   <p>Code Analysis</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="#binary_analysis" class="nav-link">
+                  <i class="nav-icon fas fa-flag"></i>
+                  <p>Binary Analysis</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="#niap_analysis" class="nav-link">
+                  <i class="fa fa-id-badge nav-icon"></i>
+                  <p> NIAP Analysis</p>
                 </a>
               </li>
               <li class="nav-item">
@@ -198,6 +210,12 @@
                 <a href="#strings" class="nav-link">
                   <i class="fas fa-font nav-icon"></i>
                   <p>Strings</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="#secrets" class="nav-link">
+                  <i class="fas fa-key nav-icon"></i>
+                  <p>Hardcoded Secrets</p>
                 </a>
               </li>
             </ul>
@@ -590,7 +608,7 @@
                   </p>
                   <p>
                     <a target="_blank" href="../ManifestView/?md5={{ md5 }}&amp;type={{ app_type }}&amp;bin=1" role="button" class="btn btn-primary"><i class="fa fa-eye"></i>  View AndroidManifest.xml</a>
-                    <a href="../Java/?md5={{ md5 }}&amp;type={{ app_type }}" class="btn btn-info" role="button"><i class="fa fa-code"></i> View Java</a>
+                    <a href="../Java/?md5={{ md5 }}&amp;type={{ app_type }}" class="btn btn-info" role="button"><i class="fa fa-code"></i> View Source</a>
                     <a href="../Smali/?md5={{ md5 }}" class="btn btn-info" role="button"><i class="fa fa-code"></i> View Smali</a>
                     </p>
                     <p>
@@ -617,22 +635,38 @@
               <p>
                 <strong><i class="fa fa-certificate"></i> SIGNER CERTIFICATE</strong>
             </p>
+            {% if certificate_analysis %}
               <pre><code>{{ certificate_analysis.certificate_info }}</code></pre>
               <!--Cert status-->
-              {% if certificate_analysis.certificate_status == "good" %}
-                <strong>Certificate Status: </strong><span class="badge bg-success">Good</span><br />
-                <strong>Description: </strong>{{ certificate_analysis.description }}<br />
-              {% elif certificate_analysis.certificate_status == "bad" %}
-                <strong>Certificate Status: </strong><span class="badge bg-danger">Bad</span><br />
-                <strong>Description:</strong>{{ certificate_analysis.description }}<br />
-              {% elif  certificate_analysis.certificate_status == "missing" %}
-                <strong>Certificate Status: </strong><span class="badge bg-warning">Certificate missing</span><br />
-                <strong>Description:</strong>{{ certificate_analysis.description }}<br />
-              {% elif certificate_analysis.certificate_status == "warning" %}
-                <strong>Certificate Status: </strong><span class="badge bg-warning">Warning</span><br />
-                <strong>Description:</strong>{{ certificate_analysis.description }}<br />
-              {% endif %}
-              
+              <div class="table-responsive">
+                  <table id="table_cert" class="table table-bordered table-hover table-striped">
+                      <thead>
+                          <tr>
+                              <th>STATUS</th>
+                              <th>DESCRIPTION</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          {% for find in certificate_analysis.certificate_findings %}
+                          <tr>
+                          <td>
+                          {% if find.0 == 'bad' %}
+                            <span class="badge bg-danger">bad</span>
+                          {% elif find.0  == 'good' %}
+                            <span class="badge bg-success">secure</span>
+                          {% elif find.0  == 'warning' %}
+                            <span class="badge bg-warning">warning</span>
+                          {% endif %}
+                          </td>
+                          <td>{{ find.1 }}</td>
+                          </tr>
+                          {% endfor %}
+                      </tbody>
+                  </table>
+           </div>
+           {% else %}
+           Failed to read Code Signing Certificate.
+           {% endif %}
           </div>
         </div><!-- /.card -->
         </div>
@@ -694,7 +728,7 @@
     </div>
 </section>
  <!-- ===========================end permission ================================== -->
- <a id="binary_analysis" class="anchor"></a>
+   <a id="android_api" class="anchor"></a>
  <section class="content">
   <div class="container-fluid">
     <div class="row">
@@ -702,81 +736,7 @@
         <div class="card">
           <div class="card-body">
               <p>
-             <strong><i class="fa fa-flag"></i> SHARED LIBRARY BINARY ANALYSIS</strong>
-             </p>
-              <div class="table-responsive">
-              <table id="table_binary" class="table table-bordered table-hover table-striped">
-                  <thead>
-                      <tr>
-                          <th>ISSUE</th>
-                          <th>SEVERITY</th>
-                          <th>DESCRIPTION</th>
-                          <th>FILES</th>
-                          
-                      </tr>
-                  </thead>
-                  <tbody>
-                    {% for item in binary_analysis %}
-                      <tr>
-                        <td>
-                        {{item|key:"title" | safe}}
-                        </td>
-                        <td>
-                          {% if item|key:"stat" == "high" %}
-                            <span class="badge bg-danger">high</span>
-                          {% elif item|key:"stat" == "info" %}
-                            <span class="badge bg-info">info</span>
-                          {% elif item|key:"stat" == "medium" %}
-                            <span class="badge bg-warning">medium</span>
-                          {% endif %}
-                         
-                        </td>
-                        <td>
-                        {{item|key:"desc" | safe}}
-                        </td>
-                        <td>
-                        {{item|key:"file"}}
-                        </td>
-   
-                       </tr>
-                     {% endfor %}
-                    {% if not binary_analysis  %}
-                       <tr>
-                         <td>
-                           <p> No issue found </p>
-                         </td>
-                         <td>
-                           <span class="badge bg-info">info</span>
-                         </td>
-                          <td>
-                           <p> </p>
-                         </td>
-                          <td>
-                           <p></p>
-                         </td>
-                       </tr>
-                    {% endif %}
-                    </tbody>
-                    </table>
-                  </div>
-              
-          </div>
-        </div><!-- /.card -->
-        </div>
-        <!-- end row -->
-        </div>
-    </div>
-</section>
- <!-- ===========================end binary analysis ================================== -->
-  <a id="android_api" class="anchor"></a>
- <section class="content">
-  <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-        <div class="card">
-          <div class="card-body">
-              <p>
-             <strong><i class="fab fa-android"></i> ANDROID JAVA API</strong>
+             <strong><i class="fab fa-android"></i> ANDROID API</strong>
              </p>
               <div class="table-responsive">
                 <table id="table_so" class="table table-bordered table-hover table-striped">
@@ -787,14 +747,14 @@
                       </tr>
                     </thead>
                     <tbody>
-                   {% for desc, details in android_api.items %}
+                   {% for rule, details in android_api.items %}
                   <tr>
                     <td>
-                    {{ desc }}
+                    {{ details.metadata.description }}
                     </td>
                     <td>
-                    {% for path in details|key:"path" %}
-                    <a href="../ViewSource/?file={{ path }}&amp;md5={{ md5 }}&amp;type={{app_type}}"> {{ path }}</a>
+                     {% for file_path, lines in details.files.items %}
+                    <a href="../ViewSource/?file={{ file_path }}&amp;md5={{ md5 }}&amp;type={{app_type}}&amp;lines={{ lines }}"> {{ file_path }}</a>
                     <br/>
                     {% endfor %}
                     </td>
@@ -891,6 +851,62 @@
     </div>
 </section>
  <!-- ===========================end browsable activities ================================== -->
+ <a id="network_security" class="anchor"></a>
+ <section class="content">
+  <div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-12">
+        <div class="card">
+          <div class="card-body">
+            <p>
+             <strong><i class="fas fa-lock"></i> NETWORK SECURITY</strong>
+             </p>
+              <div class="table-responsive">
+                <table id="table_manifest" class="table table-bordered table-hover table-striped">
+                      <thead>
+                      <tr>
+                          <th>NO</th>
+                          <th>SCOPE</th>
+                          <th>SEVERITY</th>
+                          <th>DESCRIPTION</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for item in network_security %}
+                      <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>
+                         {% for url in item.scope %}
+                          {{ url }}</br>
+                        {% endfor %}
+                        </td>
+                        <td>
+                          {% if item.severity == "high" %}
+                            <span class="badge bg-danger">high</span>
+                          {% elif item.severity == "good" %}
+                            <span class="badge bg-success">good</span>
+                          {% elif item.severity == "info" %}
+                            <span class="badge bg-info">info</span>
+                          {% elif item.severity == "warning" %}
+                            <span class="badge bg-warning">medium</span>
+                          {% endif %}
+                        </td>
+                        <td>
+                        {{item.description }}
+                        </td>
+                       </tr>
+                     {% endfor %}
+                    </tbody>
+                  </table>
+                  </div>
+          </div>
+        </div><!-- /.card -->
+        </div>
+        <!-- end row -->
+        </div>
+    </div>
+</section>
+ <!-- ===========================end network security ================================== -->
  <a id="manifest" class="anchor"></a>
  <section class="content">
   <div class="container-fluid">
@@ -905,6 +921,7 @@
                 <table id="table_manifest" class="table table-bordered table-hover table-striped">
                       <thead>
                       <tr>
+                          <th>NO</th>
                           <th>ISSUE</th>
                           <th>SEVERITY</th>
                           <th>DESCRIPTION</th>
@@ -914,6 +931,7 @@
                                       
                     {% for item in manifest_analysis %}
                       <tr>
+                        <td>{{ forloop.counter }}</td>
                         <td>
                         {{item|key:"title" | safe}}
                         </td>
@@ -959,48 +977,50 @@
                 <table id="table_code" class="table table-bordered table-hover table-striped">
                     <thead>
                     <tr>
+                      <th>NO</th>
                       <th>ISSUE</th>
                       <th>SEVERITY</th>
                       <th>STANDARDS</th>
                       <th>FILES</th>
                   </tr>
                     </thead>
-                    <tbody>
-               {% for issue, details in code_analysis.items %}
+                      <tbody>
+               {% for rule, details in code_analysis.items %}
                   <tr>
+                  <td>{{ forloop.counter }}</td>
                   <td>
-                  {{ issue }}
+                  {{ details.metadata.description }}
                   </td>
                   <td>
-                    {% if details|key:"level" == "high" %}
+                    {% if details.metadata.severity == "high" %}
                       <span class="badge bg-danger">high</span>
-                      {% elif details|key:"level" == "good" %}
+                      {% elif details.metadata.severity == "good" %}
                       <span class="badge bg-success">secure</span>
-                      {% elif details|key:"level" == "warning" %}
+                      {% elif details.metadata.severity == "warning" %}
                       <span class="badge bg-warning">warning</span>
-                      {% elif details|key:"level" == "info" %}
+                      {% elif details.metadata.severity == "info" %}
                       <span class="badge bg-info">info</span>
                       {% endif %}
                   </td>
                   <td>
                       <strong>CVSS V2:</strong>
-                      {{ details|key:"cvss" }}
-                      {% if details|key:"cvss" > 6 %}
+                      {{ details.metadata.cvss }}
+                      {% if details.metadata.cvss > 6 %}
                         (high)
-                      {% elif details|key:"cvss" == 0 %}
+                      {% elif details.metadata.cvss == 0 %}
                         (info)
-                      {% elif details|key:"cvss" >= 4 %}
+                      {% elif details.metadata.cvss >= 4 %}
                         (medium)
-                      {% elif details|key:"cvss" < 4 %}
+                      {% elif details.metadata.cvss < 4 %}
                         (low)
                       {% endif %}
-                      {% if details|key:"cwe" %}</br> <strong>CWE: </strong>{{ details|key:"cwe" }}{% endif %}
-                      {% if details|key:"owasp" %}</br> <strong>OWASP Top 10: </strong>{{ details|key:"owasp" }}{% endif %}
-                      {% if details|key:"owasp-mstg" %}</br> <strong>OWASP MASVS: </strong>{{ details|key:"owasp-mstg" }}{% endif %}
+                      {% if details.metadata.cwe %}</br> <strong>CWE: </strong>{{ details.metadata.cwe }}{% endif %}
+                      {% if details.metadata|key:"owasp-mobile" %}</br> <strong>OWASP Top 10: </strong>{{ details.metadata|key:"owasp-mobile" }}{% endif %}
+                      {% if details.metadata.masvs %}</br> <strong>OWASP MASVS: </strong>{{ details.metadata.masvs }}{% endif %}
                   </td>
                   <td>
-                  {% for path in details|key:"path" %}
-                   <a href="../ViewSource/?file={{ path }}&amp;md5={{ md5 }}&amp;type={{app_type}}"> {{ path }}</a>
+                  {% for file_path, lines in details.files.items %}
+                   <a href="../ViewSource/?file={{ file_path }}&amp;md5={{ md5 }}&amp;type={{app_type}}&amp;lines={{ lines}}"> {{ file_path }}</a>
                   <br/>
                   {% endfor %}
                   </td>
@@ -1017,6 +1037,136 @@
     </div>
 </section>
  <!-- ===========================end code analysis ================================== -->
+ <a id="binary_analysis" class="anchor"></a>
+ <section class="content">
+  <div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-12">
+        <div class="card">
+          <div class="card-body">
+              <p>
+             <strong><i class="fa fa-flag"></i> SHARED LIBRARY BINARY ANALYSIS</strong>
+             </p>
+              <div class="table-responsive">
+              <table id="table_binary" class="table table-bordered table-hover table-striped">
+                  <thead>
+                      <tr>
+                          <th>NO</th>
+                          <th>SHARED OBJECT</th>
+                          <th>NX</th>
+                          <th>PIE</th>
+                          <th>STACK CANARY</th>
+                          <th>RELRO</th>
+                          <th>RPATH</th>
+                          <th>RUNPATH</th>
+                          <th>FORTIFY</th>
+                          <th>SYMBOLS STRIPPED</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+            {% if not binary_analysis %}
+              No Shared Objects found.
+            {% endif %}
+             {% for so in binary_analysis %}
+             <tr>
+              <td>{{ forloop.counter }}</td>
+              <td>{{so.name}}</td>
+              <td><b>{{so.nx.is_nx}}</b>
+                <br/>
+                <span class="badge bg-{% if so.nx.severity == 'high' %}danger{% elif so.nx.severity == 'warning' %}warning{% else %}info{% endif %}">{{so.nx.severity}}</span>
+                <br/>{{so.nx.description}}</td>
+              <td><b>{{so.pie.is_pie}}</b>
+                <br/>
+                <span class="badge bg-{% if so.pie.severity == 'high' %}danger{% elif so.pie.severity == 'warning' %}warning{% else %}info{% endif %}">{{so.pie.severity}}</span>
+                <br/>{{so.pie.description}}</td>
+              <td><b>{{so.stack_canary.has_canary}}</b>
+                  <br/>
+                  <span class="badge bg-{% if so.stack_canary.severity == 'high' %}danger{% elif so.stack_canary.severity == 'warning' %}warning{% else %}info{% endif %}">{{so.stack_canary.severity}}</span>
+                  <br/>{{so.stack_canary.description}}</td>
+              <td><b>{{so.relocation_readonly.relro}}</b>
+                <br/>
+                <span class="badge bg-{% if so.relocation_readonly.severity == 'high' %}danger{% elif so.relocation_readonly.severity == 'warning' %}warning{% else %}info{% endif %}">{{so.relocation_readonly.severity}}</span>
+                <br/>{{so.relocation_readonly.description}}</td>
+              <td><b>{{so.rpath.rpath}}</b>
+                <br/>
+                <span class="badge bg-{% if so.rpath.severity == 'high' %}danger{% elif so.rpath.severity == 'warning' %}warning{% else %}info{% endif %}">{{so.rpath.severity}}</span>
+                <br/>{{so.rpath.description}}</td>
+              <td><b>{{so.runpath.runpath}}</b>
+                <br/>
+                <span class="badge bg-{% if so.runpath.severity == 'high' %}danger{% elif so.runpath.severity == 'warning' %}warning{% else %}info{% endif %}">{{so.runpath.severity}}</span>
+                <br/>{{so.runpath.description}}</td>
+              <td><b>{{so.fortify.is_fortified}}</b>
+                <br/>
+                <span class="badge bg-{% if so.fortify.severity == 'high' %}danger{% elif so.fortify.severity == 'warning' %}warning{% else %}info{% endif %}">{{so.fortify.severity}}</span>
+                <br/>{{so.fortify.description}}</td>
+              <td><b>{{so.symbol.is_stripped}}</b>
+                <br/>
+                <span class="badge bg-{% if so.symbol.severity == 'high' %}danger{% elif so.symbol.severity == 'warning' %}warning{% else %}info{% endif %}">{{so.symbol.severity}}</span>
+                <br/>{{so.symbol.description}}</td>
+            </tr>
+             {% endfor %}
+                    </tbody>
+                    </table>
+                  </div>
+              
+          </div>
+        </div><!-- /.card -->
+        </div>
+        <!-- end row -->
+        </div>
+    </div>
+</section>
+ <!-- ===========================end binary analysis ================================== -->
+ <a id="niap_analysis" class="anchor"></a>
+<section class="content">
+  <div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-12">
+        <div class="card">
+          <div class="card-body">
+            <p>
+             <strong><i class="fa fa-id-badge"></i> NIAP ANALYSIS</strong>
+             </p>
+              <div class="table-responsive">
+                <table id="table_file" class="table table-bordered table-hover table-striped">
+                    <thead>
+                        <tr>
+                            <th>NO</th>
+                            <th>IDENTIFIER</th>
+                            <th>REQUIREMENT</th>
+                            <th>FEATURE</th>
+                            <th>DESCRIPTION</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                  {% for iden, details in niap_analysis.items %}
+                    <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>
+                      <span class="badge {% if 'does not' in details.choice %} bg-warning {% elif 'not in accordance' in details.choice %} bg-danger {% else %} bg-info {% endif %}"> {{ iden }}</span>
+                    </td>
+                     <td>
+                     {{ details.class }}
+                    </td>
+                    <td>
+                      {{ details.description }}
+                     </td>
+                     <td>
+                      {{ details.choice }}
+                     </td>
+                  </tr>    
+                {% endfor %} 
+              </tbody>
+            </table>
+            </div>
+          </div>
+        </div><!-- /.card -->
+        </div>
+        <!-- end row -->
+        </div>
+    </div>
+</section>
+<!-- ===========================end niap analysis ================================== -->
 <a id="file_analysis" class="anchor"></a>
 <section class="content">
   <div class="container-fluid">
@@ -1031,6 +1181,7 @@
                 <table id="table_file" class="table table-bordered table-hover table-striped">
                     <thead>
                         <tr>
+                            <th>NO</th>
                             <th>ISSUE</th>
                             <th>FILES</th>
                         </tr>
@@ -1038,6 +1189,7 @@
                     <tbody>
                   {% for item in file_analysis %}
                     <tr>
+                    <td>{{ forloop.counter }}</td>
                     <td>
                     {{ item|key:"finding" }}
                     </td>
@@ -1462,6 +1614,32 @@
         </div>
 </section>
  <!-- ===========================end strings ================================== -->
+ <a id="secrets" class="anchor"></a>
+<section class="content">
+  <div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-12">
+        <div class="card">
+          <div class="card-body">
+             <p>
+             <strong><i class="fas fa-key"></i> POSSIBLE HARDCODED SECRETS</strong>
+             </p>
+               <div class="list-group">
+                  <p>  
+                    {% for val in secrets %}
+                     {{ val }}<br/>
+                    {% endfor %}                  
+                  </p>
+              </div>
+            </div>
+          </div>
+        </div><!-- /.card -->
+        </div>
+        <!-- end row -->
+        </div>
+</section>
+ <!-- ===========================end secrets ================================== -->
+
  <a id="activities" class="anchor"></a>
 <section class="content">
   <div class="container-fluid">

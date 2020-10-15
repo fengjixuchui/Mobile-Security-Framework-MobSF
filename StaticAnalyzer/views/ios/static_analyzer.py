@@ -1,8 +1,8 @@
 # -*- coding: utf_8 -*-
 """iOS Static Code Analysis."""
 import logging
-import os
 import re
+from pathlib import Path
 
 import MalwareAnalyzer.views.VirusTotal as VirusTotal
 
@@ -63,29 +63,26 @@ def static_analyzer_ios(request, api=False):
             or filename.lower().endswith('.zip'))
                 and (file_type in ['ipa', 'ios'])):
             app_dict = {}
-            app_dict['directory'] = settings.BASE_DIR  # BASE DIR
+            app_dict['directory'] = Path(settings.BASE_DIR)  # BASE DIR
             app_dict['file_name'] = filename  # APP ORGINAL NAME
             app_dict['md5_hash'] = checksum  # MD5
-            app_dict['app_dir'] = os.path.join(
-                settings.UPLD_DIR, app_dict['md5_hash'] + '/')  # APP DIRECTORY
-            tools_dir = os.path.join(
-                app_dict['directory'], 'StaticAnalyzer/tools/ios/')
-
+            app_dir = Path(settings.UPLD_DIR) / checksum
+            tools_dir = app_dict[
+                'directory'] / 'StaticAnalyzer' / 'tools' / 'ios'
+            tools_dir = tools_dir.as_posix()
             if file_type == 'ipa':
+                app_dict['app_file'] = app_dict[
+                    'md5_hash'] + '.ipa'  # NEW FILENAME
+                app_dict['app_path'] = app_dir / app_dict['app_file']
+                app_dict['app_path'] = app_dict['app_path'].as_posix()
                 # DB
                 ipa_db = StaticAnalyzerIOS.objects.filter(
                     MD5=app_dict['md5_hash'])
                 if ipa_db.exists() and rescan == '0':
                     context = get_context_from_db_entry(ipa_db)
                 else:
-
                     logger.info('iOS Binary (IPA) Analysis Started')
-                    app_dict['app_file'] = app_dict[
-                        'md5_hash'] + '.ipa'  # NEW FILENAME
-                    app_dict['app_path'] = (app_dict['app_dir']
-                                            + app_dict['app_file'])
-                    app_dict['bin_dir'] = os.path.join(
-                        app_dict['app_dir'], 'Payload/')
+                    app_dict['app_dir'] = app_dir.as_posix() + '/'
                     app_dict['size'] = str(
                         file_size(app_dict['app_path'])) + 'MB'  # FILE SIZE
                     app_dict['sha1'], app_dict['sha256'] = hash_gen(
@@ -93,8 +90,27 @@ def static_analyzer_ios(request, api=False):
                     logger.info('Extracting IPA')
                     # EXTRACT IPA
                     unzip(app_dict['app_path'], app_dict['app_dir'])
-                    # Get Files, normalize + to x,
-                    # and convert binary plist -> xml
+                    # Identify Payload directory
+                    dirs = app_dir.glob('**/*')
+                    for _dir in dirs:
+                        if 'payload' in _dir.as_posix().lower():
+                            app_dict['bin_dir'] = app_dict['app_dir'] / _dir
+                            break
+                    else:
+                        msg = ('IPA is malformed! '
+                               'MobSF cannot find Payload directory')
+                        if api:
+                            return print_n_send_error_response(
+                                request,
+                                msg,
+                                True)
+                        else:
+                            return print_n_send_error_response(
+                                request,
+                                msg,
+                                False)
+                    app_dict['bin_dir'] = app_dict['bin_dir'].as_posix() + '/'
+                    # Get Files
                     all_files = ios_list_files(
                         app_dict['bin_dir'], app_dict['md5_hash'], True, 'ipa')
                     infoplist_dict = plist_analysis(app_dict['bin_dir'], False)
@@ -152,8 +168,7 @@ def static_analyzer_ios(request, api=False):
                 if settings.VT_ENABLED:
                     vt = VirusTotal.VirusTotal()
                     context['virus_total'] = vt.get_result(
-                        os.path.join(app_dict['app_dir'], app_dict[
-                                     'md5_hash']) + '.ipa',
+                        app_dict['app_path'],
                         app_dict['md5_hash'])
                 context['average_cvss'], context[
                     'security_score'] = score(context['binary_analysis'])
@@ -171,10 +186,10 @@ def static_analyzer_ios(request, api=False):
                     logger.info('iOS Source Code Analysis Started')
                     app_dict['app_file'] = app_dict[
                         'md5_hash'] + '.zip'  # NEW FILENAME
-                    app_dict['app_path'] = (app_dict['app_dir']
-                                            + app_dict['app_file'])
+                    app_dict['app_path'] = app_dir / app_dict['app_file']
+                    app_dict['app_path'] = app_dict['app_path'].as_posix()
+                    app_dict['app_dir'] = app_dir.as_posix() + '/'
                     # ANALYSIS BEGINS - Already Unzipped
-                    logger.info('ZIP Already Extracted')
                     app_dict['size'] = str(
                         file_size(app_dict['app_path'])) + 'MB'  # FILE SIZE
                     app_dict['sha1'], app_dict['sha256'] = hash_gen(
@@ -196,11 +211,12 @@ def static_analyzer_ios(request, api=False):
                     code_analysis_dic['firebase'] = firebase_analysis(
                         list(set(code_analysis_dic['urls_list'])))
                     fake_bin_dict = {
-                        'bin_type': code_analysis_dic['source_type'],
-                        'macho': {},
-                        'bin_res': [],
-                        'libs': [],
+                        'checksec': {},
+                        'libraries': [],
+                        'bin_code_analysis': {},
                         'strings': [],
+                        'bin_info': {},
+                        'bin_type': code_analysis_dic['source_type'],
                     }
                     # Saving to DB
                     logger.info('Connecting to DB')

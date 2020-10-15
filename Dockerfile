@@ -58,8 +58,9 @@ ENV PATH="$JAVA_HOME/bin:$PATH"
 
 WORKDIR /root/Mobile-Security-Framework-MobSF
 
-# Copy source code
-COPY . .
+# Copy static
+COPY requirements.txt .
+COPY scripts/wheels/*.whl scripts/wheels/
 
 # Install Requirements
 RUN pip3 install --no-index --find-links=scripts/wheels/ yara-python && \
@@ -77,8 +78,13 @@ RUN \
     apt clean && \
     apt autoclean && \
     apt autoremove -y && \
-    rm -rf /var/lib/apt/lists/* /tmp/* > /dev/null 2>&1 && \
-    rm -rf /root/Mobile-Security-Framework-MobSF/scripts/wheels > /dev/null 2>&1
+    rm -rf /var/lib/apt/lists/* /tmp/* > /dev/null 2>&1
+
+# Copy source code
+COPY . .
+
+# Remove Wheels 
+RUN rm -rf /root/Mobile-Security-Framework-MobSF/scripts/wheels > /dev/null 2>&1 
 
 # Enable Use Home Directory and set adb path
 RUN sed -i 's/USE_HOME = False/USE_HOME = True/g' MobSF/settings.py && \
@@ -86,6 +92,12 @@ RUN sed -i 's/USE_HOME = False/USE_HOME = True/g' MobSF/settings.py && \
 
 # Postgres support is set to false by default
 ARG POSTGRES=False
+
+ENV POSTGRES_USER=postgres
+ENV POSTGRES_PASSWORD=password
+ENV POSTGRES_DB=mobsf
+ENV POSTGRES_HOST=postgres
+
 # Check if Postgres support needs to be enabled
 WORKDIR /root/Mobile-Security-Framework-MobSF/scripts
 RUN chmod +x postgres_support.sh; sync; ./postgres_support.sh $POSTGRES
@@ -99,9 +111,7 @@ EXPOSE 8000
 # MobSF Proxy
 EXPOSE 1337
 
-RUN python3 manage.py makemigrations && \
-    python3 manage.py makemigrations StaticAnalyzer && \
-    python3 manage.py migrate
+RUN chmod 755 /root/Mobile-Security-Framework-MobSF/scripts/entrypoint.sh
 
 # Run MobSF
-CMD ["gunicorn", "-b", "0.0.0.0:8000", "MobSF.wsgi:application", "--workers=1", "--threads=10", "--timeout=1800"]
+CMD ["/root/Mobile-Security-Framework-MobSF/scripts/entrypoint.sh"]
