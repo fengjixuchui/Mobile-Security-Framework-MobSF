@@ -31,7 +31,7 @@ from StaticAnalyzer.models import StaticAnalyzerAndroid
 
 logger = logging.getLogger(__name__)
 ANDROID_API_SUPPORTED = 29
-FRIDA_VERSION = '12.11.17'
+FRIDA_VERSION = '14.2.2'
 
 
 class Environment:
@@ -96,31 +96,47 @@ class Environment:
             return False
         return True
 
-    def is_package_installed(self, package):
+    def is_package_installed(self, package, extra):
         """Check if package is installed."""
+        success = '\nSuccess' in extra
         out = self.adb_command(['pm', 'list', 'packages'], True)
         pkg = f'{package}'.encode('utf-8')
-        if pkg + b'\n' in out or pkg + b'\r\n' in out:
-            # Windows uses \r\n
+        pkg_fmts = [pkg + b'\n', pkg + b'\r\n', pkg + b'\r\r\n']
+        if any(pkg in out for pkg in pkg_fmts):
+            # Windows uses \r\n and \r\r\n
+            return True
+        if success:
+            # Fallback check
             return True
         return False
 
     def install_apk(self, apk_path, package):
         """Install APK and Verify Installation."""
-        if self.is_package_installed(package):
+        if self.is_package_installed(package, ''):
             logger.info('Removing existing installation')
             # Remove existing installation'
             self.adb_command(['uninstall', package], False, True)
+        # Disable install verification
+        self.adb_command([
+            'settings',
+            'put',
+            'global',
+            'verifier_verify_adb_installs',
+            '0',
+        ], True)
         logger.info('Installing APK')
         # Install APK
-        self.adb_command([
+        out = self.adb_command([
             'install',
             '-r',
             '-t',
             '-d',
             apk_path], False, True)
+        if not out:
+            return False, 'adb install failed'
+        out = out.decode('utf-8', 'ignore')
         # Verify Installation
-        return self.is_package_installed(package)
+        return self.is_package_installed(package, out), out
 
     def adb_command(self, cmd_list, shell=False, silent=False):
         """ADB Command wrapper."""
@@ -130,9 +146,10 @@ class Environment:
         if shell:
             args += ['shell']
         args += cmd_list
-
         try:
-            result = subprocess.check_output(args)
+            result = subprocess.check_output(
+                args,
+                stderr=subprocess.STDOUT)
             return result
         except Exception:
             if not silent:
@@ -312,20 +329,20 @@ class Environment:
 
     def android_component(self, bin_hash, comp):
         """Get APK Components."""
-        anddb = StaticAnalyzerAndroid.objects.filter(MD5=bin_hash)
+        anddb = StaticAnalyzerAndroid.objects.get(MD5=bin_hash)
         resp = []
         if comp == 'activities':
-            resp = python_list(anddb[0].ACTIVITIES)
+            resp = python_list(anddb.ACTIVITIES)
         elif comp == 'receivers':
-            resp = python_list(anddb[0].RECEIVERS)
+            resp = python_list(anddb.RECEIVERS)
         elif comp == 'providers':
-            resp = python_list(anddb[0].PROVIDERS)
+            resp = python_list(anddb.PROVIDERS)
         elif comp == 'services':
-            resp = python_list(anddb[0].SERVICES)
+            resp = python_list(anddb.SERVICES)
         elif comp == 'libraries':
-            resp = python_list(anddb[0].LIBRARIES)
+            resp = python_list(anddb.LIBRARIES)
         elif comp == 'exported_activities':
-            resp = python_list(anddb[0].EXPORTED_ACTIVITIES)
+            resp = python_list(anddb.EXPORTED_ACTIVITIES)
         return '\n'.join(resp)
 
     def get_environment(self):

@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import zipfile
 from urllib.parse import urlparse
+from pathlib import Path
 
 import requests
 
@@ -26,7 +27,8 @@ from django.utils import timezone
 from django.utils.html import escape
 
 from MobSF import settings
-from MobSF.utils import (print_n_send_error_response,
+from MobSF.utils import (is_md5,
+                         print_n_send_error_response,
                          upstream_proxy)
 
 from StaticAnalyzer.models import (RecentScansDB,
@@ -303,6 +305,10 @@ def compare_apps(request, hash1: str, hash2: str, api=False):
     if hash1 == hash2:
         error_msg = 'Results with same hash cannot be compared'
         return print_n_send_error_response(request, error_msg, api)
+    # Second Validation for REST API
+    if not (is_md5(hash1) and is_md5(hash2)):
+        error_msg = 'Invalid hashes'
+        return print_n_send_error_response(request, error_msg, api)
     logger.info(
         'Starting App compare for %s and %s', hash1, hash2)
     return generic_compare(request, hash1, hash2, api)
@@ -372,3 +378,17 @@ def firebase_analysis(urls):
             if fbdic not in firebase_db:
                 firebase_db.append(fbdic)
     return firebase_db
+
+
+def find_java_source_folder(base_folder: Path):
+    # Find the correct java/kotlin source folder for APK/source zip
+    # Returns a Tuple of - (SRC_PATH, SRC_TYPE, SRC_SYNTAX)
+    return next(p for p in [(base_folder / 'java_source',
+                             'java', '*.java'),
+                            (base_folder / 'app' / 'src' / 'main' / 'java',
+                             'java', '*.java'),
+                            (base_folder / 'app' / 'src' / 'main' / 'kotlin',
+                             'kotlin', '*.kt'),
+                            (base_folder / 'src',
+                             'java', '*.java')]
+                if p[0].exists())

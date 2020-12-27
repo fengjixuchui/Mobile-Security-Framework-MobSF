@@ -21,14 +21,14 @@ logger = logging.getLogger(__name__)
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-MOBSF_VER = 'v3.1.7 Beta'
+MOBSF_VER = 'v3.2.1 Beta'
 
 BANNER = """
-  __  __       _    ____  _____       _____  _ 
- |  \/  | ___ | |__/ ___||  ___|_   _|___ / / |
- | |\/| |/ _ \| '_ \___ \| |_  \ \ / / |_ \ | |
- | |  | | (_) | |_) |__) |  _|  \ V / ___) || |
- |_|  |_|\___/|_.__/____/|_|     \_/ |____(_)_|
+  __  __       _    ____  _____   _____  ____  
+ |  \/  | ___ | |__/ ___||  ___| |___ / |___ \ 
+ | |\/| |/ _ \| '_ \___ \| |_      |_ \   __) |
+ | |  | | (_) | |_) |__) |  _|    ___) | / __/ 
+ |_|  |_|\___/|_.__/____/|_|     |____(_)_____|
 """  # noqa: W291
 # ASCII Font: Standard
 # ==============================================
@@ -178,7 +178,7 @@ MIDDLEWARE_CLASSES = (
 )
 
 MIDDLEWARE = (
-    'MobSF.views.api.rest_api_middleware.RestApiAuthMiddleware',
+    'MobSF.views.api.api_middleware.RestApiAuthMiddleware',
 )
 ROOT_URLCONF = 'MobSF.urls'
 WSGI_APPLICATION = 'MobSF.wsgi.application'
@@ -208,6 +208,10 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 # 256MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 268435456
+# REST API only mode
+# Set MOBSF_API_ONLY to 1 to enable REST API only mode
+# In this mode, web UI related urls are disabled.
+API_ONLY = os.getenv('MOBSF_API_ONLY', '0')
 
 # ===================
 # USER CONFIGURATION
@@ -227,7 +231,6 @@ else:
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     #          MOBSF USER CONFIGURATIONS
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
     # -------------------------
     # STATIC ANALYZER SETTINGS
     # -------------------------
